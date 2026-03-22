@@ -1,0 +1,197 @@
+# ==============================================
+# 操作系统生成的文件
+# ==============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ==============================================
+# IDE 和编辑器配置
+# ==============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ==============================================
+# 环境变量和敏感信息
+# ==============================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.cert
+credentials.json
+secrets.yaml
+
+# ==============================================
+# Node.js / 前端 (Next.js + React + TypeScript)
+# ==============================================
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js 构建输出
+.next/
+out/
+build/
+dist/
+
+# TypeScript
+*.tsbuildinfo
+
+# 生产构建
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 依赖目录
+jspm_packages/
+
+# 可选的 npm 缓存目录
+.npm
+
+# 可选的 eslint 缓存
+.eslintcache
+
+# 可选的 stylelint 缓存
+.stylelintcache
+
+# 微封存缓存
+.turbo
+
+# ==============================================
+# Golang
+# ==============================================
+# 编译后的二进制文件
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go 测试覆盖率文件
+*.coverprofile
+coverage.txt
+coverage.html
+
+# Go workspace 文件
+go.work
+
+# 依赖管理（如果使用 vendor）
+vendor/
+
+# ==============================================
+# 数据库文件
+# ==============================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# ==============================================
+# 临时文件和缓存
+# ==============================================
+# 临时文件
+/tmp/
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# 缓存文件
+.cache/
+.parcel-cache/
+.vite/
+
+# ==============================================
+# 日志文件
+# ==============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# ==============================================
+# 测试覆盖率
+# ==============================================
+coverage/
+*.lcov
+.nyc_output/
+
+# ==============================================
+# 其他
+# ==============================================
+# 系统文件
+.fuse_box*
+.dynamodb/
+
+# Elasticsearch
+.elasticsearch/
+
+# Sphinx 文档
+docs/_build/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+# Spyder
+.spyderproject
+.spyproject
+
+# Rope
+.ropeproject
+
+# mkdocs
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# ==============================================
+# 项目特定
+# ==============================================
+# 本地配置文件
+config.local.*
+settings.local.*
+
+# 生成的文件
+generated/
