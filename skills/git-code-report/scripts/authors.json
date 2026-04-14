@@ -1,0 +1,133 @@
+{
+  "_comment": "Author identity config. Each entry collapses multiple git identities (name/email variants) under one 'canonical' display name used in the report. The script auto-appends newly-discovered authors on each run — open this file afterwards and move duplicates into a shared entry's 'aliases' list.",
+  "authors": [
+    {
+      "canonical": "Ben",
+      "aliases": [],
+      "emails": [
+        "35423468+Ben@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "Kai",
+      "aliases": [],
+      "emails": [
+        "8443828+kai@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "Jack",
+      "aliases": [],
+      "emails": [
+        "33869522+eric-devp@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "Reed",
+      "aliases": [],
+      "emails": [
+        "26065140+Reed@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "James",
+      "aliases": [
+        "ali1314"
+      ],
+      "emails": [
+        "34292272+james@users.noreply.github.com",
+        "34292272+ali1314@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "Tim",
+      "aliases": [],
+      "emails": [
+        "143681806+Tim@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "Pony",
+      "aliases": [],
+      "emails": [
+        "205503242+jmaubay7@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "Frank",
+      "aliases": [
+        "F1sh-Yu",
+        "frank"
+      ],
+      "emails": [
+        "20256571+F1sh-Yu@users.noreply.github.com",
+        "jasonyu@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "mitsui",
+      "aliases": [],
+      "emails": [
+        "ou_831c69118dcdfb3afb39106d2b3daa8fmitsui@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "martin",
+      "aliases": [],
+      "emails": [
+        "31871958+martin@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "7G",
+      "aliases": [
+        "7g",
+        "qige"
+      ],
+      "emails": [
+        "129613686+7G@users.noreply.github.com",
+        "7G@debox.pro",
+        "qige@email.me"
+      ]
+    },
+    {
+      "canonical": "Sol",
+      "aliases": [
+        "sol"
+      ],
+      "emails": [
+        "214584314+hubsoso@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "Kidd",
+      "aliases": [
+        "mtc1146"
+      ],
+      "emails": [
+        "17537299+Kidd@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "Sunny",
+      "aliases": [],
+      "emails": [
+        "184354683+Sunny@users.noreply.github.com"
+      ]
+    },
+    {
+      "canonical": "winston",
+      "aliases": [],
+      "emails": [
+        "1244187032@qq.com"
+      ]
+    },
+    {
+      "canonical": "Debox CI Bot",
+      "aliases": [],
+      "emails": [
+        "ci@debox.pro"
+      ]
+    }
+  ]
+}
