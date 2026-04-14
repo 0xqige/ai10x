@@ -1,5 +1,5 @@
 ---
-name: code-report
+name: git-code-report
 description: Use when user asks for git contributor stats, code report, team productivity analysis, weekly/monthly dev report, or comparing raw vs effective code changes across single or multiple git repositories.
 ---
 
@@ -8,6 +8,21 @@ description: Use when user asks for git contributor stats, code report, team pro
 ## Overview
 
 Generate HTML reports analyzing git contributor statistics across one or more repositories. Reports show raw lines, effective code (excluding comments/blank lines), commit trends, daily breakdowns, and filter comparisons.
+
+## Report language
+
+The Python script renders all static UI labels (section titles, table headers, tooltips, rubric text) in **English**. Data values — author names, commit subjects, repo names, SHAs — come from git and are preserved as-is.
+
+**If the user has been interacting in a language other than English**, after the script finishes, open the output HTML and translate the static UI labels to the user's language. Do not touch:
+
+- Commit messages / subjects (they carry project meaning and may already be in the target language)
+- Author display names
+- Repository names, URLs, and SHAs
+- Raw numbers and dates
+
+What to translate: `<h1>` / `<h2>` titles, `.note` paragraphs, table `<th>` cells, card `.label` / `.sub` text, tooltip `title=` attributes, footer line, and contribution-review labels like `Business:` / `Risk:` / `Evidence:` / `Quality & Rework` / `Long-term value` / score bar labels (`Output 20%` etc.). The score bar labels carry the weight, so preserve the `20%` / `30%` percentages when translating.
+
+If the user speaks English, leave the output untouched.
 
 ## When to Use
 
@@ -41,17 +56,19 @@ python3 "${SKILL_DIR}/scripts/codereport.py" [options]
 | `--skip-eff` | Skip effective-code analysis — 5-10x faster |
 | `--output report.html` | Custom output path (default: `<system-tempdir>/code-report-YYYY-MM-DD.html`, e.g. `/tmp/code-report-2026-04-14.html` on macOS/Linux) |
 | `--dump-commits <path>` | **Review pass 1** — dump per-author commit metadata (sha/message/numstat/files) to JSON and exit. The agent reads this dump to write reviews. No HTML produced. |
-| `--reviews-json <path>` | **Review pass 2** — inject an LLM-generated `贡献点评` section into the HTML, placed before `每日代码提交趋势`. Omit this flag to skip the review section entirely. |
+| `--reviews-json <path>` | **Review pass 2** — inject an LLM-generated `Contribution Reviews` section into the HTML, placed before the `Daily Commit Trend` chart. Omit this flag to skip the review section entirely. |
 
 ## Usage Examples
 
 Replace `${SKILL_DIR}` with this skill's actual path when executing:
 
-```bash
-# Single repo, last week (fast mode)
-python3 "${SKILL_DIR}/scripts/codereport.py" --since "7 days ago" --dir /path/to/repo --skip-eff
+**Default to full mode** (with effective-code analysis). Only add `--skip-eff` when the user explicitly asks for a fast / overview-only report, or when the repo set is so large the effective pass is painfully slow. When skipped, the two "Effective" cards and the "Filter Comparison" block render an explicit *Skipped (--skip-eff)* placeholder, so a reader won't mistake "skipped" for "zero effective code".
 
-# Multi-repo, last week with effective code
+```bash
+# Single repo, last week 
+python3 "${SKILL_DIR}/scripts/codereport.py" --since "7 days ago" --dir /path/to/repo
+
+# Multi-repo, last week
 python3 "${SKILL_DIR}/scripts/codereport.py" --since "7 days ago" --dir /path/to/repos
 
 # Specific repos and date range
@@ -59,20 +76,25 @@ python3 "${SKILL_DIR}/scripts/codereport.py" --since "2026-04-07" --until "2026-
   --dir /path/to/repos --repos "debox-iOS,debox-android,debox-web"
 
 # Monthly report
+python3 "${SKILL_DIR}/scripts/codereport.py" --since "30 days ago" --dir /path/to/repos
+
+# Fast mode — only when the repo set is huge and you just need trends + raw lines
 python3 "${SKILL_DIR}/scripts/codereport.py" --since "30 days ago" --dir /path/to/repos --skip-eff
 ```
 
 ## Contribution Reviews (optional)
 
-When the user asks for per-contributor reviews, scoring, or "点评 / 评分 / 绩效", switch to the **two-pass workflow**. The script never calls an LLM — it prepares data and renders results. The agent (you) produces the judgments in between.
+When the user asks for per-contributor reviews, scoring, grading, or team performance analysis, switch to the **two-pass workflow**. The script never calls an LLM — it prepares data and renders results. The agent (you) produces the judgments in between.
 
 ### Pass 1 — Dump commits
 
 ```bash
 python3 "${SKILL_DIR}/scripts/codereport.py" --since "7 days ago" \
-  --dir /path/to/repos --skip-eff \
+  --dir /path/to/repos \
   --dump-commits /tmp/commits-dump.json
 ```
+
+> Pass 1 only collects data and exits immediately — `--skip-eff` has no effect here; you can leave it off.
 
 The dump is a JSON document of this shape:
 
@@ -80,8 +102,8 @@ The dump is a JSON document of this shape:
 {
   "window": {"since": "2026-04-07", "until": "2026-04-14"},
   "rubric": {
-    "formula": "总分 = 产出×20% + 质量×30% + 影响×30% + 协作与长期价值×20%",
-    "scale": "每项 0-100",
+    "formula": "Total = Output × 20% + Quality × 30% + Impact × 30% + Collab & Long-term × 20%",
+    "scale": "Each dimension 0-100",
     "dimensions": ["output", "quality", "impact", "collab"]
   },
   "authors": {
@@ -108,36 +130,36 @@ The dump is a JSON document of this shape:
 
 ### Pass 2 — Write reviews and render
 
-Read the dump, think about each contributor, and write a `reviews.json` matching this schema:
+Read the dump, think about each contributor, and write a `reviews.json`. **Always write the JSON content in English** so it matches the script's English baseline — localization to the user's language is done as a final pass on the rendered HTML (see "Report language" at the top of this file), not in the intermediate JSON. Schema:
 
 ```json
 {
-  "rubric": {"formula": "总分 = 产出×20% + 质量×30% + 影响×30% + 协作与长期价值×20%"},
+  "rubric": {"formula": "Total = Output × 20% + Quality × 30% + Impact × 30% + Collab & Long-term × 20%"},
   "reviews": [
     {
       "author": "Alice",
-      "summary": "本期围绕认证会话安全进行了重构，核心是双写 + 滚动刷新令牌，影响全站登录链路。",
+      "summary": "This week Alice refactored authentication session handling, centered on dual-write plus rolling refresh tokens, touching the entire login path.",
       "works": [
         {
-          "title": "重构 refresh token 轮转策略",
+          "title": "Rework refresh-token rotation strategy",
           "complexity": "high",
-          "business": "登录安全（合规强相关）",
-          "risk": "影响所有在线会话；需配合灰度",
+          "business": "Login security (compliance-adjacent)",
+          "risk": "Affects every live session; requires a staged rollout",
           "evidence": ["abc123", "def456"]
         },
         {
-          "title": "补齐 session 模块单元测试",
+          "title": "Backfill unit tests for the session module",
           "complexity": "medium",
-          "business": "质量保障",
-          "risk": "低",
+          "business": "Quality assurance",
+          "risk": "low",
           "evidence": ["789abc"]
         }
       ],
       "quality": {
-        "issues": "一处竞态在 code review 中被 Bob 发现并修复",
-        "rework": "refresh_token.py 第二次迭代重写"
+        "issues": "A race condition was caught by Bob in review and fixed before merge.",
+        "rework": "refresh_token.py was rewritten on the second iteration."
       },
-      "long_term": "session 抽象层抽出后，后续 OAuth 接入成本显著降低；补齐测试提升了后续改动信心。",
+      "long_term": "Extracting the session abstraction layer meaningfully lowers the cost of the upcoming OAuth integration; the new tests raise confidence for future changes.",
       "scores": {"output": 82, "quality": 78, "impact": 90, "collab": 85},
       "total": 83.9
     }
@@ -149,7 +171,7 @@ Then re-run the script with the review JSON to produce the final HTML:
 
 ```bash
 python3 "${SKILL_DIR}/scripts/codereport.py" --since "7 days ago" \
-  --dir /path/to/repos --skip-eff \
+  --dir /path/to/repos \
   --reviews-json /tmp/reviews.json
 ```
 
@@ -158,15 +180,15 @@ python3 "${SKILL_DIR}/scripts/codereport.py" --since "7 days ago" \
 Grade each contributor on four 0-100 dimensions. The weighted total is:
 
 ```
-总分 = 产出 × 20% + 质量 × 30% + 影响 × 30% + 协作与长期价值 × 20%
+total = output × 20% + quality × 30% + impact × 30% + collab × 20%
 ```
 
 Compute `total` yourself — the script renders whatever you put in the JSON. If `total` is missing the renderer will derive it from the four dimensions, but prefer being explicit.
 
-- **产出 (output, 20%)** — volume and breadth of delivered work: commits, lines, features shipped. High volume alone is not high score; weight toward real deliverables.
-- **质量 (quality, 30%)** — code correctness, test coverage, review feedback, bug-fix vs rework ratio. Deduct when reverts or post-merge fixes appear in the same window.
-- **影响 (impact, 30%)** — business/system value: does this unlock revenue, unblock teammates, harden an incident-prone path? A small commit touching a critical path can outscore a large refactor nobody needed.
-- **协作与长期价值 (collab, 20%)** — reviews given, tests and docs added, refactors that reduce future cost, knowledge sharing. Pure solo streaks cap here.
+- **Output (20%)** — volume and breadth of delivered work: commits, lines, features shipped. High volume alone is not a high score; weight toward real deliverables.
+- **Quality (30%)** — code correctness, test coverage, review feedback, bug-fix vs rework ratio. Deduct when reverts or post-merge fixes appear in the same window.
+- **Impact (30%)** — business / system value: does this unlock revenue, unblock teammates, harden an incident-prone path? A small commit touching a critical path can outscore a large refactor nobody needed.
+- **Collab & long-term value (20%)** — reviews given, tests and docs added, refactors that reduce future cost, knowledge sharing. Pure solo streaks cap here.
 
 ### Writing the review text
 

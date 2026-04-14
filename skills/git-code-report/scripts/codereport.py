@@ -469,6 +469,9 @@ def generate_html(report_data: dict, output_path: str):
     raw_net = raw_ins - raw_del
     code_commits = sum(1 for a in authors.values() if a["eff_ins"] > 0 or a["eff_del"] > 0)
     filter_pct = f"-{(1 - eff_ins / raw_ins) * 100:.1f}%" if raw_ins > 0 else "N/A"
+    # When --skip-eff is on, eff totals are structurally zero, not actually zero. Render a
+    # distinct placeholder in the cards so readers don't mistake "skipped" for "no effective code".
+    skip_eff = bool(d.get("skip_eff"))
 
     period_label = d["period_label"]
     since_label = d["since"]
@@ -480,8 +483,8 @@ def generate_html(report_data: dict, output_path: str):
 
     def fmt_date(date_str):
         dt = datetime.strptime(date_str, "%Y-%m-%d")
-        weekdays = ["一", "二", "三", "四", "五", "六", "日"]
-        return f"周{weekdays[dt.weekday()]} {dt.day}日"
+        weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        return f"{weekdays[dt.weekday()]} {dt.day}"
 
     daily_labels = [fmt_date(d) for d in all_dates]
 
@@ -597,10 +600,10 @@ def generate_html(report_data: dict, output_path: str):
     for i, (ds, v) in enumerate(commit_series):
         try:
             dt = datetime.strptime(ds, "%Y-%m-%d")
-            weekdays = ["一", "二", "三", "四", "五", "六", "日"]
-            tip = f"{dt.strftime('%Y-%m-%d')} 周{weekdays[dt.weekday()]} · {v} 次提交"
+            weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+            tip = f"{dt.strftime('%Y-%m-%d')} {weekdays[dt.weekday()]} · {v} commits"
         except ValueError:
-            tip = f"{ds}: {v} 次提交"
+            tip = f"{ds}: {v} commits"
         point_parts.append(
             f'<circle class="pt" cx="{_x(i):.1f}" cy="{_y(v):.1f}" r="3.5" '
             f'fill="var(--bg)" stroke="var(--accent)" stroke-width="2">'
@@ -616,7 +619,7 @@ def generate_html(report_data: dict, output_path: str):
     if raw_max == 0:
         empty_el = (
             f'<text x="{SVG_W / 2}" y="{PAD_T + chart_h / 2}" text-anchor="middle" '
-            f'fill="var(--muted-2)" font-size="12">（该时段无提交）</text>'
+            f'fill="var(--muted-2)" font-size="12">(no commits in window)</text>'
         )
 
     total_commits_in_window = sum(v for _, v in commit_series)
@@ -625,7 +628,7 @@ def generate_html(report_data: dict, output_path: str):
 
     commit_chart_svg = f'''
       <svg viewBox="0 0 {SVG_W} {SVG_H}" preserveAspectRatio="none" width="100%" height="{SVG_H}"
-           role="img" aria-label="每日提交次数折线图">
+           role="img" aria-label="Daily commit trend">
         <defs>
           <linearGradient id="commitGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.35"/>
@@ -643,10 +646,10 @@ def generate_html(report_data: dict, output_path: str):
 
     commit_chart_summary = (
         f'<div class="chart-summary">'
-        f'<span><span class="label">总提交</span> <strong class="mono">{total_commits_in_window:,}</strong></span>'
-        f'<span><span class="label">日均</span> <strong class="mono">{avg_commits:.1f}</strong></span>'
+        f'<span><span class="label">Total</span> <strong class="mono">{total_commits_in_window:,}</strong></span>'
+        f'<span><span class="label">Daily avg</span> <strong class="mono">{avg_commits:.1f}</strong></span>'
         + (
-            f'<span><span class="label">峰值</span> <strong class="mono">{peak_day[1]}</strong> '
+            f'<span><span class="label">Peak</span> <strong class="mono">{peak_day[1]}</strong> '
             f'<span class="label">（{peak_day[0]}）</span></span>'
             if peak_day[0] and peak_day[1] > 0 else ""
         )
@@ -720,7 +723,7 @@ def generate_html(report_data: dict, output_path: str):
         # the curve shows the author tooltip — not just on data points.
         if n >= 2:
             pts = " ".join(f"{_x(i):.1f},{_pa_y(v):.1f}" for i, (_, v) in enumerate(series))
-            line_tip = f"{author_name} · 共 {total} 次提交"
+            line_tip = f"{author_name} · {total} commits total"
             pa_line_parts.append(
                 f'<polyline class="pa-hit" points="{pts}" fill="none" stroke="transparent" '
                 f'stroke-width="12" stroke-linejoin="round" stroke-linecap="round" pointer-events="stroke">'
@@ -737,10 +740,10 @@ def generate_html(report_data: dict, output_path: str):
                 continue
             try:
                 dt = datetime.strptime(ds, "%Y-%m-%d")
-                weekdays = ["一", "二", "三", "四", "五", "六", "日"]
-                tip = f"{author_name} · {dt.strftime('%Y-%m-%d')} 周{weekdays[dt.weekday()]} · {v} 次"
+                weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                tip = f"{author_name} · {dt.strftime('%Y-%m-%d')} {weekdays[dt.weekday()]} · {v}"
             except ValueError:
-                tip = f"{author_name} · {ds} · {v} 次"
+                tip = f"{author_name} · {ds} · {v}"
             pa_line_parts.append(
                 f'<circle class="pa-pt" cx="{_x(i):.1f}" cy="{_pa_y(v):.1f}" r="2.5" '
                 f'fill="var(--bg)" stroke="{color}" stroke-width="1.6">'
@@ -758,17 +761,17 @@ def generate_html(report_data: dict, output_path: str):
     if not author_commit_totals:
         pa_empty_el = (
             f'<text x="{SVG_W / 2}" y="{PAD_T + chart_h / 2}" text-anchor="middle" '
-            f'fill="var(--muted-2)" font-size="12">（该时段无作者提交）</text>'
+            f'fill="var(--muted-2)" font-size="12">(no author activity in window)</text>'
         )
 
     if author_commit_totals:
         per_author_html = f'''
   <div class="section">
-    <h2>每人提交趋势</h2>
-    <p class="note">与上图共享同一时间轴与提交次数 Y 轴，每位作者一条独立折线；悬停数据点查看作者与提交数，图例按窗口内总提交数降序排列。</p>
+    <h2>Per-author Trend</h2>
+    <p class="note">Shares the X-axis (dates) and Y-axis (commit count) with the chart above. Each author is a separate line; hover any point to see author and count. Legend sorted by window-total commits descending.</p>
     <div class="chart-container">
       <svg viewBox="0 0 {SVG_W} {SVG_H}" preserveAspectRatio="none" width="100%" height="{SVG_H}"
-           role="img" aria-label="每人每日提交次数折线图">
+           role="img" aria-label="Per-author daily commit trend">
         {"".join(pa_grid_parts)}
         {"".join(pa_line_parts)}
         {pa_axis_el}
@@ -786,7 +789,7 @@ def generate_html(report_data: dict, output_path: str):
     # attribute exposes the ins/del breakdown on hover so readers can see the
     # churn behind the net number.
     def _cell_tip(ins: int, del_: int, net: int) -> str:
-        return f"新增 +{ins:,} / 删除 -{del_:,} / 净增加 {'+' if net >= 0 else ''}{net:,}"
+        return f"+{ins:,} added / -{del_:,} removed / net {'+' if net >= 0 else ''}{net:,}"
 
     daily_table_rows = ""
     for a in sorted_authors:
@@ -803,7 +806,7 @@ def generate_html(report_data: dict, output_path: str):
             row_total += net
             tip = _cell_tip(ins, dl, net)
             if ins == 0 and dl == 0:
-                cells += f'<td title="当日无提交">-</td>'
+                cells += f'<td title="no commits">-</td>'
             elif net == 0:
                 cells += f'<td class="num" title="{tip}" style="color:var(--muted)">0</td>'
             else:
@@ -836,7 +839,7 @@ def generate_html(report_data: dict, output_path: str):
     g_tip = _cell_tip(grand_ins, grand_del, grand_total)
     daily_table_total = (
         f'<tr style="background:var(--panel-2);font-weight:700">'
-        f'<td>合计</td>{total_row_cells}'
+        f'<td>Total</td>{total_row_cells}'
         f'<td title="{g_tip}" style="color:{g_color}">{g_sign}{grand_total:,}</td></tr>'
     )
 
@@ -912,10 +915,10 @@ def generate_html(report_data: dict, output_path: str):
             repos_meta_rows += f'<tr><td>{name_cell}</td><td>{rm.get("commits", 0)}</td><td>{commit_cell}</td><td>{time_cell}</td></tr>\n'
         repos_meta_html = f'''
   <div class="section">
-    <h2>仓库清单（{len(repos_meta)}）</h2>
+    <h2>Repositories ({len(repos_meta)})</h2>
     <div class="chart-container" style="padding:16px 20px">
       <table>
-        <thead><tr><th>仓库</th><th>窗口内提交数</th><th>最后提交</th><th>提交时间</th></tr></thead>
+        <thead><tr><th>Repository</th><th>Commits</th><th>Last commit</th><th>Timestamp</th></tr></thead>
         <tbody>
           {repos_meta_rows}
         </tbody>
@@ -929,14 +932,15 @@ def generate_html(report_data: dict, output_path: str):
     review_html = ""
     reviews_payload = d.get("reviews")
     if isinstance(reviews_payload, dict) and reviews_payload.get("reviews"):
-        COMPLEXITY_LABEL = {"high": "高复杂度", "medium": "中复杂度", "low": "低复杂度"}
+        COMPLEXITY_LABEL = {"high": "High complexity", "medium": "Medium", "low": "Low"}
         cards_html = []
+        option_html = []
         # Order by total score desc so top performers float up; fall back to author name.
         rv_items = sorted(
             reviews_payload["reviews"],
             key=lambda r: (-float(r.get("total") or 0), str(r.get("author", ""))),
         )
-        for rv in rv_items:
+        for idx, rv in enumerate(rv_items):
             author = str(rv.get("author", "?"))
             color = color_map.get(author, get_color(author))
             scores = rv.get("scores") or {}
@@ -980,10 +984,10 @@ def generate_html(report_data: dict, output_path: str):
                 ev_html = (" ".join(ev_chips)) if ev_chips else '<span class="muted">—</span>'
                 details = []
                 if business:
-                    details.append(f'<div><strong>业务：</strong>{business}</div>')
+                    details.append(f'<div><strong>Business:</strong> {business}</div>')
                 if risk:
-                    details.append(f'<div><strong>风险：</strong>{risk}</div>')
-                details.append(f'<div class="evidence"><strong>证据：</strong>{ev_html}</div>')
+                    details.append(f'<div><strong>Risk:</strong> {risk}</div>')
+                details.append(f'<div class="evidence"><strong>Evidence:</strong> {ev_html}</div>')
                 works_lis.append(
                     f'<li><div class="work-head"><span class="work-title">{title}</span>'
                     f'<span class="tag tag-{cx}">{cx_label}</span></div>'
@@ -995,40 +999,52 @@ def generate_html(report_data: dict, output_path: str):
             if q_issues or q_rework:
                 bits = []
                 if q_issues:
-                    bits.append(f'<div><strong>问题：</strong>{q_issues}</div>')
+                    bits.append(f'<div><strong>Issues:</strong> {q_issues}</div>')
                 if q_rework:
-                    bits.append(f'<div><strong>返工：</strong>{q_rework}</div>')
+                    bits.append(f'<div><strong>Rework:</strong> {q_rework}</div>')
                 quality_html = (
-                    f'<div class="rv-block"><h3>质量与返工</h3>{"".join(bits)}</div>'
+                    f'<div class="rv-block"><h3>Quality &amp; Rework</h3>{"".join(bits)}</div>'
                 )
 
+            author_esc = _esc(author)
+            option_html.append(
+                f'<button type="button" class="rv-tab{" active" if idx == 0 else ""}" '
+                f'data-rv-target="{idx}" style="--rv-accent:{color}" '
+                f'onclick="(function(t){{var v=t.getAttribute(\'data-rv-target\');'
+                f'var tabs=document.querySelectorAll(\'.rv-tab\');for(var i=0;i&lt;tabs.length;i++)tabs[i].classList.toggle(\'active\',tabs[i]===t);'
+                f'var a=document.querySelectorAll(\'.review-card\');for(var j=0;j&lt;a.length;j++)a[j].classList.toggle(\'active\',a[j].getAttribute(\'data-rv-idx\')===v);}})(this)">'
+                f'<span class="rv-tab-name">{author_esc}</span>'
+                f'<span class="rv-tab-score">{total:.0f}</span>'
+                f'</button>'
+            )
             cards_html.append(f'''
-      <article class="review-card" style="--rv-accent:{color}">
+      <article class="review-card{' active' if idx == 0 else ''}" data-rv-idx="{idx}" style="--rv-accent:{color}">
         <header class="rv-head">
           <div class="rv-id">
             <div class="rv-name">{_esc(author)}</div>
-            <div class="rv-meta">{len(rv.get("works") or [])} 项工作 · 加权总分</div>
+            <div class="rv-meta">{len(rv.get("works") or [])} work items · weighted total</div>
           </div>
           <div class="rv-total"><b>{total:.0f}</b><span>/100</span></div>
         </header>
         <div class="score-grid">
-          {_score_bar("产出 20%", "output")}
-          {_score_bar("质量 30%", "quality")}
-          {_score_bar("影响 30%", "impact")}
-          {_score_bar("协作长期 20%", "collab")}
+          {_score_bar("Output 20%", "output")}
+          {_score_bar("Quality 30%", "quality")}
+          {_score_bar("Impact 30%", "impact")}
+          {_score_bar("Collab 20%", "collab")}
         </div>
         {f'<div class="rv-summary">{summary}</div>' if summary else ''}
-        {f'<div class="rv-block"><h3>本期工作</h3>{works_html}</div>' if works_html else ''}
+        {f'<div class="rv-block"><h3>Work this period</h3>{works_html}</div>' if works_html else ''}
         {quality_html}
-        {f'<div class="rv-block"><h3>长期价值</h3><p>{long_term}</p></div>' if long_term else ''}
+        {f'<div class="rv-block"><h3>Long-term value</h3><p>{long_term}</p></div>' if long_term else ''}
       </article>''')
 
         rubric_text = _esc(str((reviews_payload.get("rubric") or {}).get("formula",
-                            "总分 = 产出×20% + 质量×30% + 影响×30% + 协作与长期价值×20%")))
+                            "Total = Output × 20% + Quality × 30% + Impact × 30% + Collab & Long-term × 20%")))
         review_html = f'''
   <div class="section">
-    <h2>贡献点评</h2>
-    <p class="note">{rubric_text}（每项 0-100）。评语由 LLM 基于本期 commit 元数据生成，供团队参考。</p>
+    <h2>Contribution Reviews</h2>
+    <p class="note">{rubric_text} (each dimension 0-100). Reviews are authored by an LLM from this period's commit metadata — use as a reference.</p>
+    <div class="rv-tabs" role="tablist">{"".join(option_html)}</div>
     <div class="reviews">{"".join(cards_html)}
     </div>
   </div>'''
@@ -1038,7 +1054,7 @@ def generate_html(report_data: dict, output_path: str):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{period_label} 代码报告</title>
+<title>{period_label} Code Report</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1148,11 +1164,33 @@ def generate_html(report_data: dict, output_path: str):
   footer code {{ background: transparent; border: none; padding: 0; color: var(--muted); }}
   .scroll-wrap {{ overflow-x: auto; }}
 
+  .card.muted-card {{ opacity: 0.55; }}
+  .card.muted-card .value {{ color: var(--muted); }}
+  .card.muted-card .sub {{ color: var(--muted-2); font-style: italic; }}
+
   /* === Contribution reviews === */
-  .reviews {{ display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }}
-  .review-card {{ background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  .rv-tabs {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }}
+  .rv-tab {{ display: inline-flex; align-items: center; gap: 8px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px;
+    color: var(--muted); font: inherit; font-size: 13px; font-weight: 500;
+    padding: 7px 14px; cursor: pointer; transition: all 160ms ease;
+    border-left: 3px solid var(--rv-accent, var(--border)); }}
+  .rv-tab:hover {{ background: var(--panel); color: var(--text); border-color: var(--rv-accent, var(--accent)); }}
+  .rv-tab.active {{ background: var(--panel); color: var(--text);
+    border-color: var(--rv-accent, var(--accent));
+    box-shadow: 0 0 0 1px var(--rv-accent, var(--accent)) inset; }}
+  .rv-tab-name {{ letter-spacing: 0.02em; }}
+  .rv-tab-score {{ font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    font-variant-numeric: tabular-nums; color: var(--rv-accent, var(--accent));
+    font-size: 14px; }}
+  .rv-tab.active .rv-tab-score {{ color: var(--rv-accent, var(--accent)); }}
+  .reviews {{ display: block; }}
+  .review-card {{ display: none;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
     padding: 20px 22px; position: relative; overflow: hidden;
     border-left: 3px solid var(--rv-accent, var(--accent)); }}
+  .review-card.active {{ display: block; animation: rv-fade 180ms ease; }}
+  @keyframes rv-fade {{ from {{ opacity: 0; transform: translateY(4px); }} to {{ opacity: 1; transform: none; }} }}
   .rv-head {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
     padding-bottom: 14px; border-bottom: 1px solid var(--border-soft); margin-bottom: 14px; }}
   .rv-name {{ font-size: 18px; font-weight: 600; color: var(--text); }}
@@ -1193,25 +1231,25 @@ def generate_html(report_data: dict, output_path: str):
 <div class="container">
   <header>
     <span class="eyebrow">Code Report · {period_label}</span>
-    <h1>{period_label}代码报告</h1>
+    <h1>{period_label} Code Report</h1>
     <p class="subtitle">
-      <span class="mono">{repos_count}</span> 仓库<span class="dot">·</span>全部分支<span class="dot">·</span><span class="mono">{since_label} — {until_label}</span>
+      <span class="mono">{repos_count}</span> repos<span class="dot">·</span>all branches<span class="dot">·</span><span class="mono">{since_label} — {until_label}</span>
     </p>
     <p class="method">
-      原始 = 全部文件 · <code>git log --shortstat</code> &nbsp; 有效代码 = 仅代码文件，已剔除注释和空行
+      Raw = all files via <code>git log --shortstat</code> &nbsp; Effective = code files only, comments &amp; blanks removed
     </p>
   </header>
 
   <div class="cards">
-    <div class="card"><div class="label">总提交数</div><div class="value">{total_commits:,}</div><div class="sub">全部作者</div></div>
-    <div class="card"><div class="label">原始行数</div><div class="value">+{raw_ins:,}</div><div class="sub">删除 {raw_del:,}</div></div>
-    <div class="card pos"><div class="label">有效代码行</div><div class="value">+{eff_ins:,}</div><div class="sub">删除 {eff_del:,}</div></div>
-    <div class="card {'pos' if eff_net >= 0 else 'neg'}"><div class="label">净增有效代码</div><div class="value" style="color:{'var(--pos)' if eff_net >= 0 else 'var(--neg)'}">{'+' if eff_net >= 0 else ''}{eff_net:,}</div><div class="sub">仅代码</div></div>
+    <div class="card"><div class="label">Total Commits</div><div class="value">{total_commits:,}</div><div class="sub">all authors</div></div>
+    <div class="card"><div class="label">Raw Lines</div><div class="value">+{raw_ins:,}</div><div class="sub">removed {raw_del:,}</div></div>
+    {('<div class="card muted-card"><div class="label">Effective Lines</div><div class="value">—</div><div class="sub">skipped (--skip-eff)</div></div>' if skip_eff else f'<div class="card pos"><div class="label">Effective Lines</div><div class="value">+{eff_ins:,}</div><div class="sub">removed {eff_del:,}</div></div>')}
+    {('<div class="card muted-card"><div class="label">Net Effective</div><div class="value">—</div><div class="sub">skipped (--skip-eff)</div></div>' if skip_eff else f'<div class="card {("pos" if eff_net >= 0 else "neg")}"><div class="label">Net Effective</div><div class="value" style="color:{("var(--pos)" if eff_net >= 0 else "var(--neg)")}">{("+" if eff_net >= 0 else "")}{eff_net:,}</div><div class="sub">code only</div></div>')}
   </div>
 {review_html}
   <div class="section">
-    <h2>每日代码提交趋势</h2>
-    <p class="note">Y 轴 = 当日提交次数（<span class="mono">git log --no-merges</span> 聚合所有仓库和作者）。悬停任意数据点可查看具体数值与星期。</p>
+    <h2>Daily Commit Trend</h2>
+    <p class="note">Y-axis = commits per day (<span class="mono">git log --no-merges</span>, aggregated across repos and authors). Hover any point to see the exact value and weekday.</p>
     <div class="chart-container">
       {commit_chart_svg}
       {commit_chart_summary}
@@ -1221,33 +1259,30 @@ def generate_html(report_data: dict, output_path: str):
 
   <div class="grid2">
     <div class="section">
-      <h2>原始行数（全部文件）</h2>
+      <h2>Raw Lines (all files)</h2>
       <table>
-        <thead><tr><th>作者</th><th>提交数</th><th>新增</th><th>删除</th><th>净增</th></tr></thead>
+        <thead><tr><th>Author</th><th>Commits</th><th>Added</th><th>Removed</th><th>Net</th></tr></thead>
         <tbody>{raw_table_rows}</tbody>
       </table>
     </div>
 
     <div class="section">
-      <h2>有效代码（剔除注释/空行）</h2>
-      <table>
-        <thead><tr><th>作者</th><th>文件数</th><th>新增</th><th>删除</th><th style="width:30%">净增</th></tr></thead>
-        <tbody>{eff_table_rows}</tbody>
-      </table>
+      <h2>Effective Code (comments &amp; blanks stripped)</h2>
+      {('<p class="note muted">Effective-code analysis was skipped via <code>--skip-eff</code>.</p>' if skip_eff else f'<table><thead><tr><th>Author</th><th>Files</th><th>Added</th><th>Removed</th><th style="width:30%">Net</th></tr></thead><tbody>{eff_table_rows}</tbody></table>')}
     </div>
   </div>
 
   <div class="section">
-    <h2>每日明细</h2>
+    <h2>Daily Breakdown</h2>
     <p class="note">
-      单元格数值 = <strong>净增加行数</strong>（当日新增 − 当日删除）。
-      <span class="pos">绿色</span> 表示净增，<span class="neg">红色</span> 表示净减，
-      <span style="color:var(--muted)">0</span> 表示有提交但增删相抵，<span style="color:var(--muted)">-</span> 表示当日无提交。
-      鼠标悬停任意单元格可查看 <span class="mono">新增 / 删除 / 净增</span> 拆分。
+      Cell values = <strong>net lines added</strong> (insertions − deletions for the day).
+      <span class="pos">Green</span> = net add, <span class="neg">red</span> = net remove,
+      <span style="color:var(--muted)">0</span> = active day with equal ins/del, <span style="color:var(--muted)">-</span> = no commits that day.
+      Hover any cell to see the <span class="mono">added / removed / net</span> breakdown.
     </p>
     <div class="scroll-wrap">
     <table>
-      <thead><tr><th>作者</th>{date_headers}<th>合计</th></tr></thead>
+      <thead><tr><th>Author</th>{date_headers}<th>Total</th></tr></thead>
       <tbody>
         {daily_table_rows}
         {daily_table_total}
@@ -1256,21 +1291,21 @@ def generate_html(report_data: dict, output_path: str):
     </div>
   </div>
 
-  <div class="section">
-    <h2>过滤效果对比</h2>
+  {('' if skip_eff else f'''<div class="section">
+    <h2>Filter Comparison</h2>
     <div class="chart-container" style="padding:16px 20px">
       <table style="border:none;background:transparent">
-        <thead><tr><th style="background:transparent">指标</th><th style="background:transparent">原始（全部文件）</th><th style="background:transparent">有效代码</th><th style="background:transparent">过滤掉</th></tr></thead>
+        <thead><tr><th style="background:transparent">Metric</th><th style="background:transparent">Raw (all files)</th><th style="background:transparent">Effective</th><th style="background:transparent">Filtered</th></tr></thead>
         <tbody>
-          <tr><td style="border:none">新增行</td><td style="border:none">{raw_ins:,}</td><td style="border:none;color:#3fb950;font-weight:700">{eff_ins:,}</td><td style="border:none;color:#f85149">{filter_pct}</td></tr>
-          <tr><td style="border:none">删除行</td><td style="border:none">{raw_del:,}</td><td style="border:none;color:#f85149;font-weight:700">{eff_del:,}</td><td style="border:none;color:#f85149">{filter_del_pct}</td></tr>
-          <tr><td style="border:none">净增</td><td style="border:none">{'+' if raw_net >= 0 else ''}{raw_net:,}</td><td style="border:none;color:{'#3fb950' if eff_net >= 0 else '#f85150'};font-weight:700">{'+' if eff_net >= 0 else ''}{eff_net:,}</td><td style="border:none;color:#f85149">{filter_net_pct}</td></tr>
+          <tr><td style="border:none">Insertions</td><td style="border:none">{raw_ins:,}</td><td style="border:none;color:#3fb950;font-weight:700">{eff_ins:,}</td><td style="border:none;color:#f85149">{filter_pct}</td></tr>
+          <tr><td style="border:none">Deletions</td><td style="border:none">{raw_del:,}</td><td style="border:none;color:#f85149;font-weight:700">{eff_del:,}</td><td style="border:none;color:#f85149">{filter_del_pct}</td></tr>
+          <tr><td style="border:none">Net</td><td style="border:none">{("+" if raw_net >= 0 else "")}{raw_net:,}</td><td style="border:none;color:{("#3fb950" if eff_net >= 0 else "#f85150")};font-weight:700">{("+" if eff_net >= 0 else "")}{eff_net:,}</td><td style="border:none;color:#f85149">{filter_net_pct}</td></tr>
         </tbody>
       </table>
     </div>
-  </div>
+  </div>''')}
 {repos_meta_html}
-  <footer>生成于 {datetime.now().strftime('%Y-%m-%d %H:%M')} &middot; scripts/codereport.py &middot; 统计周期：{since_label} ~ {until_label}</footer>
+  <footer>Generated {datetime.now().strftime('%Y-%m-%d %H:%M')} &middot; scripts/codereport.py &middot; Window: {since_label} ~ {until_label}</footer>
 </div>
 </body>
 </html>'''
@@ -1327,7 +1362,7 @@ def main():
                              "then exit. The agent uses this dump to generate reviews.")
     parser.add_argument("--reviews-json", default="",
                         help="Path to LLM-generated reviews JSON. When provided, the report gains a "
-                             "'贡献点评' section rendered before the daily commit trend chart.")
+                             "'Contribution Reviews' section rendered before the daily commit trend chart.")
     args = parser.parse_args()
 
     authors_config = load_authors_config(args.authors_config)
@@ -1384,9 +1419,9 @@ def main():
 
     diff_days = (until_dt - since_dt).days if since_dt and until_dt else 7
     if diff_days <= 7:
-        period_label = "周"
+        period_label = "Weekly"
     elif diff_days <= 31:
-        period_label = "月"
+        period_label = "Monthly"
     else:
         period_label = ""
 
@@ -1452,8 +1487,8 @@ def main():
         dump_payload = {
             "window": {"since": since_label, "until": until_label},
             "rubric": {
-                "formula": "总分 = 产出×20% + 质量×30% + 影响×30% + 协作与长期价值×20%",
-                "scale": "每项 0-100",
+                "formula": "Total = Output × 20% + Quality × 30% + Impact × 30% + Collab & Long-term × 20%",
+                "scale": "Each dimension 0-100",
                 "dimensions": ["output", "quality", "impact", "collab"],
             },
             "authors": {
@@ -1508,6 +1543,7 @@ def main():
         "per_author_daily": merge_per_author_daily_commits(all_daily_commits),
         "repos_meta": repos_meta,
         "reviews": reviews_data,
+        "skip_eff": args.skip_eff,
     }
 
     generate_html(report_data, output_path)
